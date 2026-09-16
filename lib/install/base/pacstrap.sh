@@ -50,11 +50,13 @@ install_base_pacstrap()
         reflector \
         bluez bluez-utils \
         pipewire pipewire-audio pipewire-alsa pipewire-pulse wireplumber \
+        gstreamer gst-plugins-base gst-plugins-good \
         udisks2 polkit \
         sudo \
 		man-db \
         git neovim \
         tar gzip unzip 7zip binutils \
+        noto-fonts noto-fonts-cjk noto-fonts-emoji \
         plymouth
 
     msg "Base system installed."
