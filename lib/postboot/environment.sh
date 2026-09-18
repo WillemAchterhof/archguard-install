@@ -8,20 +8,30 @@
 
 prepare_environment()
 {
-    local source_postboot_file="$AG_DIR_POSTBOOT/run-postboot.sh"
     local target_dir="$AG_INSTALL_ROOT/opt/archguard"
+    local target_file="$target_dir/run-postboot.sh"
     local wifi_source="$AG_DIR_STATE/config/wifi.env"
     local wifi_target="$target_dir/config/base/wifi.env"
+    local postboot_url="https://raw.githubusercontent.com/WillemAchterhof/archguard-post/refs/heads/main/run-postboot.sh"
 
     msg "Preparing postboot environment"
 
-    [[ -f "$source_postboot_file" ]] \
-        || fatal "Postboot runner missing: $source_postboot_file"
-
-    rm -rf -- "$target_dir"
     mkdir -p -- "$target_dir"
 
-    cp -a -- "$source_postboot_file" "$target_dir/"
+    # --------------------------------------------------------------------------
+    # Download postboot runner
+    # --------------------------------------------------------------------------
+
+    msg "Downloading postboot runner"
+
+    curl -fsSL \
+        "$postboot_url" \
+        -o "$target_file" \
+        || fatal "Failed to download postboot runner"
+
+    chmod 755 "$target_file"
+
+    msg "Postboot runner installed: $target_file"
 
     # --------------------------------------------------------------------------
     # Wi-Fi configuration
