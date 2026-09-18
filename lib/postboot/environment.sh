@@ -1,26 +1,27 @@
 #!/usr/bin/env bash
-# ==============================================================================
-#  Arch Secure Installer V2.6 — Prepare Postboot Environment
-# ==============================================================================
-#  lib/postboot/prepare/environment.sh
-# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# Arch Secure Installer V2.6 — Prepare Postboot Environment
+# ------------------------------------------------------------------------------
+# /lib/postboot/environment.sh
+# ------------------------------------------------------------------------------
 
 prepare_environment()
 {
-    local source_dir="$AG_DIR_POSTBOOT/install"
+    local source_postboot_file="$AG_DIR_POSTBOOT/run-postboot.sh"
     local target_dir="$AG_INSTALL_ROOT/opt/archguard"
     local wifi_source="$AG_DIR_STATE/config/wifi.env"
     local wifi_target="$target_dir/config/base/wifi.env"
 
     msg "Preparing postboot environment"
 
-    [[ -d "$source_dir" ]] \
-        || fatal "Postboot install directory missing: $source_dir"
+    [[ -f "$source_postboot_file" ]] \
+        || fatal "Postboot runner missing: $source_postboot_file"
 
     rm -rf -- "$target_dir"
     mkdir -p -- "$target_dir"
 
-    cp -a -- "$source_dir/." "$target_dir/"
+    cp -a -- "$source_postboot_file" "$target_dir/"
 
     # --------------------------------------------------------------------------
     # Wi-Fi configuration

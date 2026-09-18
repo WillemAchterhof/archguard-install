@@ -2,7 +2,7 @@
 # ==============================================================================
 #  Arch Secure Installer V2.6 — Clean Wi-Fi Configuration
 # ==============================================================================
-#  lib/postboot/prepare/cleanup_preboot.sh
+#  lib/postboot/cleanup_preboot.sh
 #
 #  Provides:
 #    clean_wifi_config

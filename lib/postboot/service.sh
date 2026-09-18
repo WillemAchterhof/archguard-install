@@ -2,7 +2,7 @@
 # ==============================================================================
 #  Arch Secure Installer V2.6 — Postboot Service Preparation
 # ==============================================================================
-#  lib/postboot/prepare/service.sh
+#  lib/postboot/service.sh
 #
 #  Prepares postboot execution through the installation user's login shell.
 # ==============================================================================

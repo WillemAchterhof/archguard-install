@@ -7,8 +7,7 @@
 #  Loads postboot preparation components.
 # ==============================================================================
 
-for file in "$AG_DIR_POSTBOOT/prepare"/*.sh; do
-    [[ -f "$file" ]] || continue
-
-    source "$file"
-done
+source "$AG_DIR_POSTBOOT/run.sh"
+source "$AG_DIR_POSTBOOT/environment.sh"
+source "$AG_DIR_POSTBOOT/service.sh"
+source "$AG_DIR_POSTBOOT/cleanup_preboot.sh"

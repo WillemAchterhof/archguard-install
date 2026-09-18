@@ -2,7 +2,7 @@
 # ==============================================================================
 #  Arch Secure Installer V2.6 — Postboot Runner
 # ==============================================================================
-#  lib/postboot/install/run.sh
+#  lib/postboot/run-postboot.sh
 #
 #  Loads all postboot components recursively and executes the final actions.
 # ==============================================================================
@@ -16,7 +16,7 @@ POSTBOOT_ROOT="/opt/archguard"
 # ==============================================================================
 
 while IFS= read -r -d '' file; do
-    [[ "$file" == "$POSTBOOT_ROOT/run.sh" ]] && continue
+    [[ "$file" == "$POSTBOOT_ROOT/run-postboot.sh" ]] && continue
 
     source "$file"
 done < <(
