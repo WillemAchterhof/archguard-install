@@ -1,40 +1,53 @@
 #!/usr/bin/env bash
 
 # ------------------------------------------------------------------------------
+# Arch Secure Installer V2.6 — Prepare Postboot Environment
 # ArchGuard Post-Boot
 # ------------------------------------------------------------------------------
-# /run-postboot.sh
+# /lib/postboot/environment.sh
 # ------------------------------------------------------------------------------
 
-set -Eeuo pipefail
+prepare_environment()
+{
+    local target_dir="$AG_INSTALL_ROOT/opt/archguard"
+    local target_file="$target_dir/run-postboot.sh"
+    local wifi_source="$AG_DIR_STATE/config/wifi.env"
+    local wifi_target="$target_dir/config/base/wifi.env"
+    local postboot_url="https://raw.githubusercontent.com/WillemAchterhof/archguard-post/refs/heads/main/run-postboot.sh"
 
-POST_INSTALL_URL="https://github.com/WillemAchterhof/archguard-post.git"
-POST_INSTALL="/opt/archguard/post_install"
+    msg "Preparing postboot environment"
 
-BACKUP_SOURCE="$AG_DIR_STATE/backup/ArchGuard.png"
-BACKUP_TARGET="$POST_INSTALL/backup"
+    mkdir -p -- "$target_dir"
 
-printf "[*] Preparing ArchGuard Post-Install...\n"
+    # --------------------------------------------------------------------------
+    # Download postboot runner
+    # --------------------------------------------------------------------------
 
-# ------------------------------------------------------------------------------
-# Clone Post-Install
-# ------------------------------------------------------------------------------
+    msg "Downloading postboot runner"
 
-git clone \
-    "$POST_INSTALL_URL" \
-    "$POST_INSTALL"
+    curl -fsSL \
+        "$postboot_url" \
+        -o "$target_file" \
+        || fatal "Failed to download postboot runner"
 
-chmod +x "$POST_INSTALL/root-run.sh"
+    chmod 755 "$target_file"
 
-# ------------------------------------------------------------------------------
-# Copy ArchGuard background
-# ------------------------------------------------------------------------------
+    msg "Postboot runner installed: $target_file"
 
-mkdir -p -- "$BACKUP_TARGET"
+    # --------------------------------------------------------------------------
+    # Wi-Fi configuration
+    # --------------------------------------------------------------------------
 
-if [[ -f "$BACKUP_SOURCE" ]]; then
-    cp -f -- "$BACKUP_SOURCE" "$BACKUP_TARGET/ArchGuard.png"
-    printf "[*] ArchGuard background copied.\n"
-else
-    printf "[!] ArchGuard background not found: %s\n" "$BACKUP_SOURCE"
-fi
+    if [[ -f "$wifi_source" ]]; then
+        mkdir -p -- "$(dirname "$wifi_target")"
+
+        cp -f -- "$wifi_source" "$wifi_target"
+        chmod 600 "$wifi_target"
+
+        msg "Saved Wi-Fi configuration copied to postboot environment"
+    else
+        msg "No saved Wi-Fi configuration found"
+    fi
+
+    msg "Postboot environment prepared"
+}
