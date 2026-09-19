@@ -14,6 +14,10 @@ prepare_environment()
     local wifi_target="$target_dir/config/base/wifi.env"
     local postboot_url="https://raw.githubusercontent.com/WillemAchterhof/archguard-post/refs/heads/main/run-postboot.sh"
 
+    BACKUP_SOURCE="$AG_DIR_STATE/backup/ArchGuard.png"
+    BACKUP_TARGET="$POST_INSTALL/backup"
+    mkdir -p -- "$target_dir"
+    
     msg "Preparing postboot environment"
 
     mkdir -p -- "$target_dir"
