@@ -23,7 +23,7 @@ check_root(){
 }
 
 init_variables(){
-    readonly AG_REPO_URL="https://github.com/WillemAchterhof/archguard.git"
+    readonly AG_REPO_URL="https://github.com/WillemAchterhof/archguard-install.git"
     readonly AG_REPO_BRANCH="main"
 
     readonly AG_DIR_BASE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
