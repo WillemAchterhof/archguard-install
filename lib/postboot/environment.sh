@@ -15,6 +15,9 @@ prepare_environment()
     local wifi_target="$target_dir/config/base/wifi.env"
     local postboot_url="https://raw.githubusercontent.com/WillemAchterhof/archguard-post/refs/heads/main/run-postboot.sh"
 
+    local backup_source="$AG_DIR_STATE/backup/ArchGuard.png"
+    local backup_target="$POST_INSTALL/backup"
+    
     msg "Preparing postboot environment"
 
     mkdir -p -- "$target_dir"
@@ -48,6 +51,20 @@ prepare_environment()
     else
         msg "No saved Wi-Fi configuration found"
     fi
+
+    # ------------------------------------------------------------------------------
+    # Copy ArchGuard background
+    # ------------------------------------------------------------------------------
+
+    mkdir -p -- "$BACKUP_TARGET"
+
+    if [[ -f "$BACKUP_SOURCE" ]]; then
+        cp -f -- "$BACKUP_SOURCE" "$BACKUP_TARGET/ArchGuard.png"
+        printf "[*] ArchGuard background copied.\n"
+    else
+        printf "[!] ArchGuard background not found: %s\n" "$BACKUP_SOURCE"
+    fi
+
 
     msg "Postboot environment prepared"
 }
