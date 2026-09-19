@@ -15,7 +15,7 @@ prepare_environment()
     local postboot_url="https://raw.githubusercontent.com/WillemAchterhof/archguard-post/refs/heads/main/run-postboot.sh"
 
     BACKUP_SOURCE="$AG_DIR_STATE/backup/ArchGuard.png"
-    BACKUP_TARGET="$POST_INSTALL/backup"
+    BACKUP_TARGET="$target_dir/backup"
     mkdir -p -- "$target_dir"
     
     msg "Preparing postboot environment"
