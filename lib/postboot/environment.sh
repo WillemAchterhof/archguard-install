@@ -38,11 +38,3 @@ if [[ -f "$BACKUP_SOURCE" ]]; then
 else
     printf "[!] ArchGuard background not found: %s\n" "$BACKUP_SOURCE"
 fi
-
-# ------------------------------------------------------------------------------
-# Start Post-Install
-# ------------------------------------------------------------------------------
-
-printf "[*] Starting ArchGuard Post-Install...\n"
-
-exec "$POST_INSTALL/root-run.sh"
