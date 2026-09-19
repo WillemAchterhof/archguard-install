@@ -2,7 +2,6 @@
 
 # ------------------------------------------------------------------------------
 # Arch Secure Installer V2.6 — Prepare Postboot Environment
-# ArchGuard Post-Boot
 # ------------------------------------------------------------------------------
 # /lib/postboot/environment.sh
 # ------------------------------------------------------------------------------
@@ -15,9 +14,6 @@ prepare_environment()
     local wifi_target="$target_dir/config/base/wifi.env"
     local postboot_url="https://raw.githubusercontent.com/WillemAchterhof/archguard-post/refs/heads/main/run-postboot.sh"
 
-    local backup_source="$AG_DIR_STATE/backup/ArchGuard.png"
-    local backup_target="$POST_INSTALL/backup"
-    
     msg "Preparing postboot environment"
 
     mkdir -p -- "$target_dir"
@@ -51,6 +47,8 @@ prepare_environment()
     else
         msg "No saved Wi-Fi configuration found"
     fi
+
+    msg "Postboot environment prepared"
 
     # ------------------------------------------------------------------------------
     # Copy ArchGuard background
