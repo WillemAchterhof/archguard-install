@@ -12,7 +12,7 @@ POST_INSTALL_URL="https://github.com/WillemAchterhof/archguard-post.git"
 POST_INSTALL="/opt/archguard/post_install"
 
 BACKUP_SOURCE="$AG_DIR_STATE/backup/ArchGuard.png"
-BACKUP_TARGET="$POST_INSTALL/backup/ArchGuard.png"
+BACKUP_TARGET="$POST_INSTALL/backup"
 
 printf "[*] Preparing ArchGuard Post-Install...\n"
 
@@ -30,10 +30,10 @@ chmod +x "$POST_INSTALL/root-run.sh"
 # Copy ArchGuard background
 # ------------------------------------------------------------------------------
 
-mkdir -p -- "$(dirname "$BACKUP_TARGET")"
+mkdir -p -- "$BACKUP_TARGET"
 
 if [[ -f "$BACKUP_SOURCE" ]]; then
-    cp -f -- "$BACKUP_SOURCE" "$BACKUP_TARGET"
+    cp -f -- "$BACKUP_SOURCE" "$BACKUP_TARGET/ArchGuard.png"
     printf "[*] ArchGuard background copied.\n"
 else
     printf "[!] ArchGuard background not found: %s\n" "$BACKUP_SOURCE"
