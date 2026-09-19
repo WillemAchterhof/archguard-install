@@ -12,7 +12,7 @@ POST_INSTALL_URL="https://github.com/WillemAchterhof/archguard-post.git"
 POST_INSTALL="/opt/archguard/post_install"
 
 BACKUP_SOURCE="$AG_DIR_STATE/backup/ArchGuard.png"
-BACKUP_TARGET="/opt/archguard/backup/ArchGuard.png"
+BACKUP_TARGET="$POST_INSTALL/backup/ArchGuard.png"
 
 printf "[*] Preparing ArchGuard Post-Install...\n"
 
