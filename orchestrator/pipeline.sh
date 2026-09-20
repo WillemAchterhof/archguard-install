@@ -50,5 +50,5 @@ run_pipeline()
     msg "Installer finished"
     log_header "SESSION COMPLETE"
 
-    reboot_to_uefi
+    # reboot_to_uefi
 }
