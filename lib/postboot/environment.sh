@@ -67,6 +67,8 @@ prepare_environment()
         printf "[!] ArchGuard background not found: %s\n" "$BACKUP_SOURCE"
     fi
 
+    run_chroot chown -R "$AG_P_USERNAME:$AG_P_USERNAME" /opt/archguard
 
+    msg "Ownership set for: $AG_P_USERNAME"
     msg "Postboot environment prepared"
 }
