@@ -42,7 +42,7 @@ prepare_service()
 
 # ARCHGUARD_POSTBOOT_START
 if [[ -f "/opt/archguard/run-postboot.sh" ]]; then
-    sudo bash "/opt/archguard/run-postboot.sh"
+    bash "/opt/archguard/run-postboot.sh"
 fi
 # ARCHGUARD_POSTBOOT_END
 EOF

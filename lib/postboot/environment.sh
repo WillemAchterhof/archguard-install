@@ -16,11 +16,11 @@ prepare_environment()
 
     BACKUP_SOURCE="$AG_DIR_STATE/backup/ArchGuard.png"
     BACKUP_TARGET="$target_dir/backup"
-    mkdir -p -- "$target_dir"
-    
+        
     msg "Preparing postboot environment"
 
     mkdir -p -- "$target_dir"
+    chmod 755 "$target_dir"
 
     # --------------------------------------------------------------------------
     # Download postboot runner
