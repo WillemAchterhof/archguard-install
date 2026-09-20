@@ -57,7 +57,8 @@ install_base_pacstrap()
         git neovim \
         tar gzip unzip 7zip binutils \
         noto-fonts noto-fonts-cjk noto-fonts-emoji \
-        plymouth
+        plymouth \
+        plasma
 
     msg "Base system installed."
 }
