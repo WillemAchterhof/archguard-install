@@ -13,7 +13,7 @@ The first step is a bootable ISO containing:
 
 USB
 - ARCHGUARD_LIVE
-- ARCHGUARD_DATA (currently created manually)
+- ARCHGUARD_DATA
 
 The live environment provides the boot and installation environment.
 The data partition provides persistent storage for Arch Guard.
