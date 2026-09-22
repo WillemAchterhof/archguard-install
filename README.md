@@ -13,7 +13,8 @@ The first step is a bootable ISO containing:
 
 USB
 
-├── ARCHGUARD_LIVE\n
+├── ARCHGUARD_LIVE
+
 └── ARCHGUARD_DATA (currently created manually)
 
 The live environment provides the boot and installation environment.
