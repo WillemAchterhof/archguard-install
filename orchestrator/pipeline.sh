@@ -45,10 +45,10 @@ run_pipeline()
     module_install
 
     msg "Prepare Postboot Installation"
-    #module_postboot
+    module_postboot
 
     msg "Installer finished"
     log_header "SESSION COMPLETE"
 
-    # reboot_to_uefi
+    reboot_to_uefi
 }
