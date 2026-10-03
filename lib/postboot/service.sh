@@ -39,7 +39,6 @@ prepare_service()
     # --------------------------------------------------------------------------
 
     cat >> "$bash_profile" <<'EOF'
-
 # ARCHGUARD_POSTBOOT_START
 if [[ -f "/opt/archguard/run-postboot.sh" ]]; then
     bash "/opt/archguard/run-postboot.sh"
