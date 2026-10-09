@@ -18,10 +18,6 @@ set -Eeuo pipefail
 # Initialization
 # ==============================================================================
 
-check_root(){
-   [[ $EUID -eq 0 ]] || fatal "Must be run as root. Use: sudo bash archguard_install.sh"
-}
-
 init_variables(){
     readonly AG_REPO_URL="https://github.com/WillemAchterhof/archguard-install.git"
     readonly AG_REPO_BRANCH="main"
