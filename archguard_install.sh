@@ -225,6 +225,12 @@ network_connection(){
 # Packages Check
 # ==============================================================================
 
+prepare_pacman_keyring() {
+    pacman-key --init || return 1
+    pacman-key --populate archlinux || return 1
+    pacman -Sy --needed archlinux-keyring || return 1
+}
+
 package_check(){
 
 	AG_INSTALL_PACKAGES=()	
@@ -328,6 +334,7 @@ main(){
 	initialization
 	logging_setup
 	network_connection
+	prepare_pacman_keyring
 	packages_check
 	repository_sync
 	handoff
