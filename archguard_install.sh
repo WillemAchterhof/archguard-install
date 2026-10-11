@@ -2,342 +2,368 @@
 set -Eeuo pipefail
 
 # ==============================================================================
-#  Arch Secure Installer V2.6
+# ArchGuard Installer Bootstrap
 # ==============================================================================
-#  Bootstrap entry point for the Arch Secure Installer.
+# Runs from the AGBOOT partition on the ArchGuard live ISO.
 #
-#  This script prepares the minimal environment required to start the full
-#  installer. Its responsibility is intentionally limited to bootstrap tasks.
+# Responsibilities:
+#   - Make sure an internet connection is available (Wi-Fi setup if needed)
+#   - Make sure git is available
+#   - Download the installer repository next to this script (install/)
+#   - Hand control to the installer orchestrator
 #
-#  After successful preparation, control is handed off to: ag_orchestrator.sh
-#
-#  The bootstrap script remains intentionally small and self-contained.
-#  All actual installation logic lives inside the cloned installer repository.
-
-# ==============================================================================
-# Initialization
+# Layout (relative to this script, normally the AGBOOT mount point):
+#   archguard-install.sh   this script
+#   install/               the cloned installer repository (replaced each run)
+#   backup-configs/        configuration backup (never touched here)
 # ==============================================================================
 
-init_variables(){
-    readonly AG_REPO_URL="https://github.com/WillemAchterhof/archguard-install.git"
-    readonly AG_REPO_BRANCH="main"
-
-    readonly AG_DIR_BASE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    readonly AG_DIR_INSTALL="$AG_DIR_BASE/install"
-    readonly AG_DIR_STATE="$AG_DIR_BASE/state"
-	
-	readonly AG_DIR_LOG="$AG_DIR_STATE/log"
-	readonly AG_DIR_CONFIG="$AG_DIR_STATE/config"
-
-    readonly AG_FILE_LOG="$AG_DIR_LOG/archguard_install.log"
-    readonly AG_FILE_WIFI="$AG_DIR_CONFIG/wifi.env"
-	
-	AG_WIFI_DEVICE=""
-	AG_WIFI_SSID=""
-	AGS_WIFI_PASSWORD=""
-}
-
-init_state(){
-    local dir
-
-    for dir in \
-        "$AG_DIR_STATE" \
-        "$AG_DIR_LOG" \
-        "$AG_DIR_CONFIG"
-    do
-        [[ -d "$dir" ]] || mkdir -p "$dir"
-
-        if [[ ! -w "$dir" ]]; then
-            chmod u+w "$dir" 2>/dev/null || true
-        fi
-
-        [[ -w "$dir" ]] \
-            || fatal "Directory not writable: $dir"
-    done
-
-    : > "$AG_FILE_LOG"
-}
-
-# --------------
-initialization(){
-	init_variables
-  	check_root
-	init_state
-}
-
-# ==============================================================================
-# Error Handling
-# ==============================================================================
-
-trap_err(){
-    local exit_code=$?
-
-    local command="${BASH_COMMAND:-unknown}"
-    local line="${BASH_LINENO[0]}"
-    local file="${BASH_SOURCE[1]:-unknown}"
-
-    local message="[FATAL]
-File    : $file:$line
-Command : $command
-Exit    : $exit_code"
-
-    printf "%s\n" "$message"
-
-    [[ -n "${AG_FILE_LOG:-}" ]] &&
-        printf "%s\n" "$message" >> "$AG_FILE_LOG"
-
-    exit "$exit_code"
-}
-
-trap 'trap_err' ERR
-
-# ==============================================================================
+# ------------------------------------------------------------------------------
 # Logging
-# ==============================================================================
+# ------------------------------------------------------------------------------
 
-log(){
-    printf " %s\n" "$1"
-    printf " %s\n" "$1" >> "$AG_FILE_LOG"
+msg() {
+    printf '[*] %s\n' "$*"
 }
 
-log_silent(){
-    printf " %s\n" "$1" >> "$AG_FILE_LOG"
+success() {
+    printf '[+] %s\n' "$*"
 }
 
-msg(){
-    log "[*] $1"
+warn() {
+    printf '[!] %s\n' "$*" >&2
 }
 
-fatal(){
-    log "[FATAL] $1"
+fatal() {
+    local message="${1:-Unknown error}"
+    local source="${BASH_SOURCE[1]:-${BASH_SOURCE[0]}}"
+    local line="${BASH_LINENO[0]:-${LINENO}}"
+
+    printf '[FATAL] %s:%s: %s\n' "$source" "$line" "$message" >&2
     exit 1
 }
 
-log_header(){
-    log_silent "================================================================================"
-    log_silent "$1"
-    log_silent " $(date '+%Y-%m-%d %H:%M:%S')"
-    log_silent "================================================================================"
+# Export shared functions so the Bash orchestrator can reuse them.
+export -f msg success warn fatal
+
+# ------------------------------------------------------------------------------
+# Cleanup and error handling
+# ------------------------------------------------------------------------------
+
+CLEANUP_DONE=0
+TEMP_DIR=""
+OLD_INSTALL_MOVED=0
+
+cleanup() {
+    if (( CLEANUP_DONE == 1 )); then
+        return 0
+    fi
+
+    # Restore the previous installation if promotion failed.
+    if (( OLD_INSTALL_MOVED == 1 )) &&
+       [[ -n "${TEMP_DIR:-}" ]] &&
+       [[ -d "$TEMP_DIR/previous-install" ]] &&
+       [[ ! -e "${DIR_INSTALL:-}" ]]; then
+
+        if mv -- "$TEMP_DIR/previous-install" "$DIR_INSTALL"; then
+            warn "Restored the previous installation."
+            OLD_INSTALL_MOVED=0
+        else
+            warn "Could not restore the previous installation."
+            warn "Preserving temporary files at: $TEMP_DIR"
+            TEMP_DIR=""
+            CLEANUP_DONE=1
+            return 1
+        fi
+    fi
+
+    if [[ -n "${TEMP_DIR:-}" && -d "$TEMP_DIR" ]]; then
+        if ! rm -rf -- "$TEMP_DIR"; then
+            warn "Could not remove temporary directory: $TEMP_DIR"
+            CLEANUP_DONE=1
+            return 1
+        fi
+    fi
+
+    TEMP_DIR=""
+    CLEANUP_DONE=1
+    return 0
 }
 
-log_variables(){
-    log_silent "VARIABLES"
+on_error() {
+    local status=$?
+    local source="${BASH_SOURCE[1]:-${BASH_SOURCE[0]}}"
+    local line="${BASH_LINENO[0]:-${LINENO}}"
 
-    while IFS= read -r var; do
-        [[ "$var" == AGS_* ]] && continue
-        log_silent "$(printf " %-20s = %q" "$var" "${!var}")"
-    done < <(compgen -A variable AG_)
+    trap - ERR INT
 
-    log_silent "================================================================================"
+    # Do not print the failed command: it could contain sensitive data.
+    printf '[FATAL] %s:%s: Command failed (exit %s).\n' \
+        "$source" "$line" "$status" >&2
+
+    cleanup || true
+    exit "$status"
 }
 
-logging_setup(){
-    log_header "BOOTSTRAP"
-    log_variables
+on_interrupt() {
+    trap - ERR INT
+
+    printf '\n[!] Bootstrap interrupted by user (Ctrl+C).\n' >&2
+
+    cleanup || true
+    exit 130
 }
 
-# ==============================================================================
-# Network Connection
-# ==============================================================================
+trap 'on_error' ERR
+trap 'on_interrupt' INT
 
-check_internet(){
+# Covers every exit path, including fatal(). cleanup() is idempotent, and the
+# exec in handoff() bypasses this trap (the temporary directory is already gone).
+trap 'cleanup || true' EXIT
+
+# ------------------------------------------------------------------------------
+# Initialization
+# ------------------------------------------------------------------------------
+
+init_variables() {
+    readonly REPO_URL="https://github.com/WillemAchterhof/archguard-install.git"
+    readonly REPO_BRANCH="main"
+
+    # Entry point inside the cloned repository.
+    readonly ORCHESTRATOR_NAME="orchestrator.sh"
+
+    readonly DIR_BASE="$(
+        cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &&
+        pwd -P
+    )"
+
+    readonly DIR_INSTALL="$DIR_BASE/install"
+    readonly DIR_BACKUP="$DIR_BASE/backup-configs"
+
+    # Wi-Fi credentials remain in memory.
+    WIFI_DEVICE=""
+    WIFI_SSID=""
+    AGS_WIFI_PASSWORD=""
+
+    # The orchestrator can read this path, but the bootstrap never modifies it.
+    export DIR_BACKUP
+}
+
+# ------------------------------------------------------------------------------
+# Network
+# ------------------------------------------------------------------------------
+
+check_internet() {
     timeout 5 ping -c 1 -W 2 1.1.1.1 >/dev/null 2>&1
 }
 
-wifi_show(){
-    AG_WIFI_DEVICE="$(iwctl device list | awk '/station/ {print $2; exit}')"
+wifi_connect() {
+    command -v iwctl >/dev/null 2>&1 ||
+        fatal "iwctl is not available."
 
-    [[ -n "$AG_WIFI_DEVICE" ]] \
-        || fatal "No wireless adapter found."
+    # iwctl colours its output; strip the escape codes before parsing.
+    WIFI_DEVICE="$(
+        iwctl device list |
+        sed 's/\x1b\[[0-9;]*m//g' |
+        awk '$NF == "station" { print $1; exit }'
+    )"
 
-    msg "Scanning for wireless networks..."
+    [[ -n "$WIFI_DEVICE" ]] ||
+        fatal "No wireless station was found. Check the adapter."
 
-    iwctl station "$AG_WIFI_DEVICE" scan
-    sleep 2
-
-    printf "\nAvailable wireless networks:\n\n"
-
-    iwctl station "$AG_WIFI_DEVICE" get-networks |
-        tail -n +5 |
-        sed 's/^[>* ]*//'
-
-    printf "\n"
-}
-
-wifi_select(){
-    printf "SSID: "
-    read -r AG_WIFI_SSID
-}
-
-wifi_password(){
-    printf "\nPassword: "
-    read -rs AGS_WIFI_PASSWORD
-    printf "\n"
-}
-
-wifi_attempt(){
-    iwctl station "$AG_WIFI_DEVICE" connect \
-        "$AG_WIFI_SSID" \
-        --passphrase "$AGS_WIFI_PASSWORD"
-}
-
-wifi_connect(){
     while ! check_internet; do
+        msg "Scanning for wireless networks..."
 
-        wifi_select
-        wifi_password
+        iwctl station "$WIFI_DEVICE" scan ||
+            warn "Wireless scan failed; continuing."
 
-        if wifi_attempt; then
+        sleep 2
+
+        iwctl station "$WIFI_DEVICE" get-networks ||
+            warn "Could not retrieve the wireless network list."
+
+        printf '\n'
+        printf 'Wi-Fi SSID: '
+        read -r WIFI_SSID
+
+        [[ -n "$WIFI_SSID" ]] || {
+            warn "SSID cannot be empty."
+            continue
+        }
+
+        printf 'Wi-Fi password: '
+        read -rs AGS_WIFI_PASSWORD
+        printf '\n'
+
+        msg "Attempting to connect..."
+
+        # iwctl accepts --passphrase as a command-line option.
+        # Note that command-line arguments can be visible to privileged
+        # local processes while the connection command is running.
+        if iwctl --passphrase "$AGS_WIFI_PASSWORD" \
+            station "$WIFI_DEVICE" connect "$WIFI_SSID"; then
             sleep 3
+        else
+            warn "Wi-Fi connection command failed."
         fi
 
-        if check_internet; then
-            break
+        if ! check_internet; then
+            warn "Connection or internet check failed. Try again."
         fi
-
-        printf "\nUnable to connect. Please try again.\n\n"
-
     done
 
-    printf "\nConnected.\n\n"
+    success "Internet connection established."
 }
 
-wifi_save(){
-    cat > "$AG_FILE_WIFI" <<EOF
-AG_WIFI_SSID=$(printf '%q' "$AG_WIFI_SSID")
-AGS_WIFI_PASSWORD=$(printf '%q' "$AGS_WIFI_PASSWORD")
-EOF
+network_connection() {
+    if check_internet; then
+        success "Internet connection already available."
+        return 0
+    fi
 
-    chmod 600 "$AG_FILE_WIFI"
-    
-    unset AGS_WIFI_PASSWORD
+    msg "No internet connection detected. Starting Wi-Fi setup..."
+    wifi_connect
 }
 
-# ------------------
-network_connection(){
-    check_internet && return
-    wifi_show
-	wifi_connect
-    wifi_save
-}
-
-# ==============================================================================
-# Packages Check
-# ==============================================================================
+# ------------------------------------------------------------------------------
+# Package preparation
+# ------------------------------------------------------------------------------
 
 prepare_pacman_keyring() {
-    pacman-key --init || return 1
-    pacman-key --populate archlinux || return 1
-    pacman -Sy --needed archlinux-keyring || return 1
+    msg "Preparing the pacman keyring..."
+
+    pacman-key --init ||
+        fatal "Failed to initialize the pacman keyring."
+
+    pacman-key --populate archlinux ||
+        fatal "Failed to populate the Arch Linux keyring."
+
+    pacman -Sy --needed --noconfirm archlinux-keyring ||
+        fatal "Failed to update the Arch Linux keyring."
 }
 
-package_check(){
+# git is normally already on the ISO; only touch pacman when it is missing.
 
-	AG_INSTALL_PACKAGES=()	
-	readonly AG_PACKAGES_BOOTSTRAP=(
-		git
-		curl
-	)
-	
-    local package
-
-    for package in "${AG_PACKAGES_BOOTSTRAP[@]}"; do
-
-        if command -v "$package" >/dev/null 2>&1; then
-            log "[installed] $package"
-        else
-            AG_INSTALL_PACKAGES+=("$package")
-        fi
-
-    done
-}
-
-package_install(){
-    [[ ${#AG_INSTALL_PACKAGES[@]} -eq 0 ]] && return
-
-    msg "Installing required bootstrap packages..."
-
-    pacman -Sy --noconfirm --needed \
-        "${AG_INSTALL_PACKAGES[@]}" \
-        || fatal "Failed to install required packages."
-}
-
-# --------------
-packages_check(){
-	package_check
-	package_install
-}
-
-# ==============================================================================
-# Repository
-# ==============================================================================
-
-check_install_dir(){
-    local base
-	local install
-
-    base="$(realpath "$AG_DIR_BASE")"
-    install="$(realpath -m "$AG_DIR_INSTALL")"
-
-    [[ "$install" == "$base" ]] \
-        && fatal "AG_DIR_INSTALL must not be the base dir itself: $install"
-
-    [[ "$install" == "$base/"* ]] \
-        || fatal "AG_DIR_INSTALL is outside base dir, refusing to remove: $install"
-}
-
-repository_remove(){
-    check_install_dir
-
-    if [[ -d "$AG_DIR_INSTALL" ]]; then
-        rm -rf -- "$AG_DIR_INSTALL" \
-            || fatal "Failed to remove previous installer."
-
-        msg "Previous repository removed."
-    else
-        msg "No previous repository detected."
+packages_check() {
+    if command -v git >/dev/null 2>&1; then
+        success "Git is already available."
+        return 0
     fi
+
+    prepare_pacman_keyring
+
+    msg "Installing Git and updating the system..."
+
+    pacman -Sy --needed --noconfirm git ||
+        fatal "Failed to update the system or install git."
+
+    command -v git >/dev/null 2>&1 ||
+        fatal "Git is still unavailable."
+
+    success "Git is available."
 }
 
-repository_clone(){
-    msg "Downloading installer..."
+# ------------------------------------------------------------------------------
+# Download and install the orchestrator
+# ------------------------------------------------------------------------------
+
+repository_sync() {
+    local repository_dir
+    local previous_install
+
+    TEMP_DIR="$(mktemp -d "$DIR_BASE/.archguard.XXXXXX")"
+
+    repository_dir="$TEMP_DIR/repository"
+    previous_install="$TEMP_DIR/previous-install"
+
+    msg "Downloading ArchGuard installer..."
 
     git clone \
-        --branch "$AG_REPO_BRANCH" \
         --depth 1 \
-        "$AG_REPO_URL" \
-        "$AG_DIR_INSTALL" \
-        || fatal "Failed to clone repository."
+        --branch "$REPO_BRANCH" \
+        "$REPO_URL" \
+        "$repository_dir" ||
+        fatal "Failed to download the installer repository."
+
+    [[ -f "$repository_dir/$ORCHESTRATOR_NAME" ]] ||
+        fatal "The repository does not contain $ORCHESTRATOR_NAME."
+
+    [[ -x "$repository_dir/$ORCHESTRATOR_NAME" ]] ||
+        chmod +x "$repository_dir/$ORCHESTRATOR_NAME" ||
+        fatal "Could not make $ORCHESTRATOR_NAME executable."
+
+    # Keep the existing installation until the new clone is validated.
+    if [[ -e "$DIR_INSTALL" ]]; then
+        msg "Preserving the current installation temporarily..."
+
+        mv -- "$DIR_INSTALL" "$previous_install" ||
+            fatal "Could not move the existing installation."
+
+        OLD_INSTALL_MOVED=1
+    fi
+
+    # Promote the validated repository into the managed install directory.
+    if ! mv -- "$repository_dir" "$DIR_INSTALL"; then
+        warn "Could not activate the new installation."
+
+        if (( OLD_INSTALL_MOVED == 1 )); then
+            if mv -- "$previous_install" "$DIR_INSTALL"; then
+                OLD_INSTALL_MOVED=0
+                fatal "The previous installation was restored."
+            else
+                warn "Automatic restoration failed."
+                warn "The previous installation remains at: $previous_install"
+
+                # Preserve the previous installation rather than deleting it.
+                TEMP_DIR=""
+                fatal "Installation failed; manual recovery is required."
+            fi
+        fi
+
+        fatal "Could not activate the new installation."
+    fi
+
+    OLD_INSTALL_MOVED=0
+
+    # The new installation is in place; remove temporary files.
+    rm -rf -- "$TEMP_DIR" ||
+        warn "Could not remove temporary files: $TEMP_DIR"
+
+    TEMP_DIR=""
+
+    success "Installer repository is ready."
 }
 
-# ---------------
-repository_sync(){
-    repository_remove
-    repository_clone
+# ------------------------------------------------------------------------------
+# Handoff
+# ------------------------------------------------------------------------------
+
+handoff() {
+    local orchestrator="$DIR_INSTALL/$ORCHESTRATOR_NAME"
+
+    [[ -f "$orchestrator" ]] ||
+        fatal "Orchestrator not found: $orchestrator"
+
+    # Pass credentials through the environment, not through a config file.
+    export WIFI_SSID
+    export AGS_WIFI_PASSWORD
+
+    success "Starting ArchGuard orchestrator..."
+
+    # The orchestrator should define its own traps and cleanup routine.
+    exec bash "$orchestrator" "$@"
 }
 
-# ------
-handoff(){
-    [[ -f "$AG_DIR_INSTALL/orchestrator.sh" ]] \
-        || fatal "Installer entry point not found."
+# ------------------------------------------------------------------------------
+# Main
+# ------------------------------------------------------------------------------
 
-    msg "Starting installer..."
-
-	exec bash "$AG_DIR_INSTALL/orchestrator.sh"
+main() {
+    init_variables
+    network_connection
+    packages_check
+    repository_sync
+    handoff "$@"
 }
 
-# ==============================================================================
-# MAIN
-# ==============================================================================
-
-main(){
-	initialization
-	logging_setup
-	network_connection
-	prepare_pacman_keyring
-	packages_check
-	repository_sync
-	handoff
-}
-
-main
+main "$@"
